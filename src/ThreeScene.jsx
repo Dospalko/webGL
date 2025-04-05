@@ -2,8 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 // Import OrbitControls
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import sampleData from '../data/locations.json'; // Importuj dáta
-
+import sampleData from './data/locations.json'; // Načítanie dát z JSON súboru
 function latLonToCartesian(lat, lon, radius) {
     const phi = (90 - lat) * (Math.PI / 180);   // Sklon od osi Y (uhol k pólu)
     const theta = (lon + 180) * (Math.PI / 180); // Azimut okolo osi Y (uhol od -Z osi)

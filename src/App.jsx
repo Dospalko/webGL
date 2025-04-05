@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ThreeScene from './ThreeScene';
-import sampleData from './data/locations.json'; // Rovnaké dáta môžeme použiť aj tu
+import SampleData from './data/locations.json' // Rovnaké dáta môžeme použiť aj tu
 
 function App() {
   const [hoveredData, setHoveredData] = useState(null);
