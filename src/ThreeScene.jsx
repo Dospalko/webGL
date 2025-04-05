@@ -2,6 +2,18 @@ import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 // Import OrbitControls
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import sampleData from '../data/locations.json'; // Importuj dáta
+
+function latLonToCartesian(lat, lon, radius) {
+    const phi = (90 - lat) * (Math.PI / 180);   // Sklon od osi Y (uhol k pólu)
+    const theta = (lon + 180) * (Math.PI / 180); // Azimut okolo osi Y (uhol od -Z osi)
+
+    const x = -(radius * Math.sin(phi) * Math.cos(theta));
+    const z = radius * Math.sin(phi) * Math.sin(theta);
+    const y = radius * Math.cos(phi);
+
+    return new THREE.Vector3(x, y, z);
+}
 
 const ThreeScene = ({ onDataPointHover }) => { // Pridáme prop pre komunikáciu s App
   const mountRef = useRef(null);
@@ -56,7 +68,24 @@ const ThreeScene = ({ onDataPointHover }) => { // Pridáme prop pre komunikáciu
     scene.add(earthMesh);
 
 
-    // --- (Sem neskôr pridáme dátové body) ---
+    const dataPointsGroup = new THREE.Group(); // Skupina pre ľahšiu manipuláciu
+    const pointGeometry = new THREE.SphereGeometry(0.015, 16, 16); // Malá gulička pre marker
+
+    sampleData.forEach(point => {
+    const pointMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xff0000, // Napr. červená farba
+        // Farbu môžeme neskôr nastaviť podľa point.value
+    }); 
+    
+    const position = latLonToCartesian(point.lat, point.lon, 1.01); // 1.01 aby boli mierne nad povrchom
+    const pointMesh = new THREE.Mesh(pointGeometry, pointMaterial);
+    pointMesh.position.copy(position);
+    pointMesh.userData = { id: point.id, name: point.name, value: point.value }; // Uložíme dáta do objektu
+    
+    dataPointsGroup.add(pointMesh);
+    });
+
+    scene.add(dataPointsGroup); 
 
 
     // --- Animačná slučka ---
