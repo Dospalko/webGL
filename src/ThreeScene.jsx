@@ -1,96 +1,105 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
+// Import OrbitControls
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-const ThreeScene = () => {
-  const mountRef = useRef(null); // Ref pre pripojenie canvasu
+const ThreeScene = ({ onDataPointHover }) => { // Pridáme prop pre komunikáciu s App
+  const mountRef = useRef(null);
+  const controlsRef = useRef(); // Ref pre OrbitControls
 
   useEffect(() => {
-    // --- Základné nastavenie Three.js ---
     const currentMount = mountRef.current;
+    let animationFrameId;
 
-    // 1. Scéna
+    // --- Scéna, Kamera, Renderer (podobné ako predtým) ---
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x111111); // Tmavé pozadie
+    // Môžeme pridať jemné ambientné svetlo, aby bola textúra viditeľná aj bez priameho svetla
+    scene.add(new THREE.AmbientLight(0xaaaaaa)); 
+    // Pridáme aj smerové svetlo pre tiene a zvýraznenie tvaru
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    directionalLight.position.set(5, 3, 5);
+    scene.add(directionalLight);
 
-    // 2. Kamera
+
     const camera = new THREE.PerspectiveCamera(
-      75, // FOV (Field of View)
-      currentMount.clientWidth / currentMount.clientHeight, // Aspect Ratio
-      0.1, // Near clipping plane
-      1000 // Far clipping plane
+      75,
+      currentMount.clientWidth / currentMount.clientHeight,
+      0.1,
+      1000
     );
-    camera.position.z = 5; // Posun kamery
+    camera.position.z = 3; // Začneme trochu bližšie
 
-    // 3. Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true }); // antialias pre hladšie hrany
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
-    currentMount.appendChild(renderer.domElement); // Pripoj canvas do divu
+    currentMount.appendChild(renderer.domElement);
 
-    // 4. Objekt (Kocka)
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    // Použijeme MeshStandardMaterial, aby reagoval na svetlo
-    const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 }); 
-    const cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
+    // --- OrbitControls ---
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; // Plynulejší pohyb
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 1.5; // Minimálny zoom
+    controls.maxDistance = 10;  // Maximálny zoom
+    controlsRef.current = controls; // Uložíme referenciu
 
-    // 5. Svetlo (aby sme videli MeshStandardMaterial)
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Jemné svetlo všade
-    scene.add(ambientLight);
+    // --- Zemeguľa ---
+    const textureLoader = new THREE.TextureLoader();
+    const earthTexture = textureLoader.load('/zem1.jpg'); // Načítanie z /public
 
-    const pointLight = new THREE.PointLight(0xffffff, 1); // Silnejšie svetlo z jedného bodu
-    pointLight.position.set(5, 5, 5); // Pozícia svetla
-    scene.add(pointLight);
+    const sphereGeometry = new THREE.SphereGeometry(1, 32, 32); // Guľa s polomerom 1
+    // Použijeme MeshStandardMaterial pre realistickejší vzhľad so svetlom
+    const sphereMaterial = new THREE.MeshStandardMaterial({
+       map: earthTexture,
+       // roughness: 0.7, // Menej lesklý povrch
+       // metalness: 0.1, 
+    }); 
+    const earthMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    scene.add(earthMesh);
+
+
+    // --- (Sem neskôr pridáme dátové body) ---
 
 
     // --- Animačná slučka ---
-    let animationFrameId;
     const animate = () => {
-      cube.rotation.x += 0.01;
-      cube.rotation.y += 0.01;
-
+      controls.update(); // Nutné pre damping u OrbitControls
       renderer.render(scene, camera);
       animationFrameId = requestAnimationFrame(animate);
     };
     animate();
 
-    // --- Handler pre zmenu veľkosti okna ---
-    const handleResize = () => {
-      if (currentMount) {
-        // Aktualizuj veľkosť renderera
-        renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
-        // Aktualizuj pomer strán kamery
-        camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
-        camera.updateProjectionMatrix(); // Nutné po zmene parametrov kamery
-      }
+    // --- Resize Handler (rovnaký ako predtým) ---
+     const handleResize = () => {
+        if (currentMount) {
+            renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
+            camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
+            camera.updateProjectionMatrix();
+        }
     };
     window.addEventListener('resize', handleResize);
 
 
-    // --- Čistiaca funkcia (Cleanup) ---
-    // Spustí sa, keď sa komponent odpojí (unmount)
+    // --- Cleanup ---
     return () => {
-      // Zastav animáciu
-      cancelAnimationFrame(animationFrameId); 
-      // Odstráň listener pre resize
+      cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
-      // Odstráň canvas z DOMu
+      controls.dispose(); // Uvoľnenie OrbitControls
       if (currentMount) {
         currentMount.removeChild(renderer.domElement);
       }
-      // Tu by si mohol pridať aj dispose pre geometrie, materiály atď. pre uvoľnenie pamäte
-      geometry.dispose();
-      material.dispose();
-      // renderer.dispose(); // Ak máš komplexnejšiu scénu
+      // Uvoľnenie zdrojov Three.js
+      sphereGeometry.dispose();
+      sphereMaterial.dispose();
+      earthTexture.dispose();
+      // Aj svetlá a iné zdroje by sa mali uvoľniť v komplexnejšej aplikácii
     };
 
-  }, []); // Prázdne pole závislostí znamená, že useEffect sa spustí len raz po prvom renderovaní
+  }, []); // Spustí sa len raz
 
-  // Vrátime div, do ktorého Three.js vloží svoj canvas
-  // Dôležité je nastaviť mu rozmery cez CSS (napr. v #root alebo priamo tu)
+  // Div pre canvas
   return (
     <div
       ref={mountRef}
-      style={{ width: '100%', height: '100%', display: 'block' }} // Zaistí, že div zaberie priestor
+      style={{ width: '100%', height: '100%', display: 'block' }}
     />
   );
 };
