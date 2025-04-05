@@ -19,13 +19,13 @@ function latLonToCartesian(lat, lon, radius) {
 const ThreeScene = ({ onDataPointHover }) => {
     const mountRef = useRef(null);
     const controlsRef = useRef();
-    const sceneRef = useRef(); // Ref pre scénu, ak ju potrebujeme mimo useEffect
-    const rendererRef = useRef(); // Ref pre renderer
-    const cameraRef = useRef(); // Ref pre kameru
-    const raycasterRef = useRef(new THREE.Raycaster()); // Ref pre raycaster
-    const mouseRef = useRef(new THREE.Vector2()); // Ref pre pozíciu myši
-    const dataPointsGroupRef = useRef(); // Ref pre skupinu dátových bodov
-    const hoveredPointRef = useRef(null); // Ref pre aktuálne hovernutý bod
+    const sceneRef = useRef();
+    const rendererRef = useRef();
+    const cameraRef = useRef();
+    const raycasterRef = useRef(new THREE.Raycaster());
+    const mouseRef = useRef(new THREE.Vector2());
+    const dataPointsGroupRef = useRef();
+    const hoveredPointRef = useRef(null);
 
     // Farby pre vizualizáciu
     const defaultPointColor = 0xff0000; // Červená
@@ -33,16 +33,15 @@ const ThreeScene = ({ onDataPointHover }) => {
 
     useEffect(() => {
         const currentMount = mountRef.current;
-        if (!currentMount) return; // Počkať, kým je mount div pripravený
+        if (!currentMount) return;
 
         let animationFrameId;
 
         // --- Inicializácia (iba ak ešte neexistuje renderer) ---
-        // Toto zabraňuje opätovnej inicializácii pri HMR (Hot Module Replacement)
         if (!rendererRef.current) {
             // 1. Scéna
             sceneRef.current = new THREE.Scene();
-            sceneRef.current.background = new THREE.Color(0x111111); // Tmavé pozadie pre istotu
+            sceneRef.current.background = new THREE.Color(0x111111);
 
             // 2. Svetlá
             sceneRef.current.add(new THREE.AmbientLight(0xbbbbbb));
@@ -62,7 +61,7 @@ const ThreeScene = ({ onDataPointHover }) => {
             // 4. Renderer
             rendererRef.current = new THREE.WebGLRenderer({ antialias: true });
             rendererRef.current.setSize(currentMount.clientWidth, currentMount.clientHeight);
-            rendererRef.current.setPixelRatio(window.devicePixelRatio); // Pre ostrejší obraz na HiDPI
+            rendererRef.current.setPixelRatio(window.devicePixelRatio);
             currentMount.appendChild(rendererRef.current.domElement);
 
             // 5. OrbitControls
@@ -71,21 +70,22 @@ const ThreeScene = ({ onDataPointHover }) => {
             controlsRef.current.dampingFactor = 0.05;
             controlsRef.current.minDistance = 1.3;
             controlsRef.current.maxDistance = 10;
+            // Nepovinné: nastavenie autoRotate pre overenie, či sa niečo hýbe
+            // controlsRef.current.autoRotate = true;
+            // controlsRef.current.autoRotateSpeed = 0.5;
 
             // 6. Zemeguľa
             const textureLoader = new THREE.TextureLoader();
             const earthTexture = textureLoader.load('/earthmap.jpg', () => {
-                 // Textúra sa načítala, môžeme spustiť animáciu
                  console.log("Earth texture loaded.");
-                 animate(); // Začni animáciu až po načítaní textúry
+                 if (!animationFrameId) animate(); // Spustiť len ak ešte nebeží
             }, undefined, (error) => {
                 console.error('Error loading Earth texture:', error);
-                // Ak textúra zlyhá, stále môžeme spustiť animáciu s čiernou guľou
-                 animate();
+                 if (!animationFrameId) animate(); // Spustiť aj pri chybe
             });
-            earthTexture.colorSpace = THREE.SRGBColorSpace; // Správny farebný priestor
+            earthTexture.colorSpace = THREE.SRGBColorSpace;
 
-            const sphereGeometry = new THREE.SphereGeometry(1, 64, 64); // Vyššia kvalita gule
+            const sphereGeometry = new THREE.SphereGeometry(1, 64, 64);
             const sphereMaterial = new THREE.MeshStandardMaterial({
                 map: earthTexture,
                 roughness: 0.8,
@@ -97,7 +97,7 @@ const ThreeScene = ({ onDataPointHover }) => {
             // 7. Atmosféra (voliteľné)
             const atmosphereGeometry = new THREE.SphereGeometry(1.03, 64, 64);
             const atmosphereMaterial = new THREE.MeshBasicMaterial({
-                color: 0x87ceeb, // Svetlo modrá
+                color: 0x87ceeb,
                 transparent: true,
                 opacity: 0.15,
                 side: THREE.BackSide
@@ -107,35 +107,30 @@ const ThreeScene = ({ onDataPointHover }) => {
 
             // 8. Dátové body
             dataPointsGroupRef.current = new THREE.Group();
-            const pointGeometry = new THREE.SphereGeometry(0.012, 16, 16); // Veľkosť markeru
+            const pointGeometry = new THREE.SphereGeometry(0.012, 16, 16);
 
             sampleData.forEach(point => {
-                // Vytvoríme unikátny materiál pre každý bod, aby sme mohli meniť farbu
                 const pointMaterial = new THREE.MeshBasicMaterial({ color: defaultPointColor });
-                const position = latLonToCartesian(point.lat, point.lon, 1.01); // Mierne nad povrchom
+                const position = latLonToCartesian(point.lat, point.lon, 1.01);
                 const pointMesh = new THREE.Mesh(pointGeometry, pointMaterial);
                 pointMesh.position.copy(position);
-                pointMesh.userData = { ...point, type: 'dataPoint' }; // Uložíme všetky dáta + typ
+                pointMesh.userData = { ...point, type: 'dataPoint' };
                 dataPointsGroupRef.current.add(pointMesh);
             });
             sceneRef.current.add(dataPointsGroupRef.current);
         }
 
-
         // --- Animačná slučka ---
         const animate = () => {
-            // ?. pre istotu, ak by sa referencie ešte nenastavili (napr. pri rýchlom HMR)
             controlsRef.current?.update();
             rendererRef.current?.render(sceneRef.current, cameraRef.current);
             animationFrameId = requestAnimationFrame(animate);
         };
 
-        // Ak už renderer existuje (napr. pri HMR alebo ak textúra nebola nájdená),
-        // rovno spusti animáciu (alebo pokračuj v nej)
-        if (rendererRef.current && !animationFrameId) {
+        // Spustiť animáciu, ak ešte nebeží (dôležité po načítaní textúry alebo pri HMR)
+        if (!animationFrameId) {
            animate();
         }
-
 
         // --- Event Listeners ---
         const handleResize = () => {
@@ -149,9 +144,8 @@ const ThreeScene = ({ onDataPointHover }) => {
         };
 
         const handleMouseMove = (event) => {
-            if (!currentMount || !cameraRef.current || !dataPointsGroupRef.current || !raycasterRef.current) return;
+             if (!currentMount || !cameraRef.current || !dataPointsGroupRef.current || !raycasterRef.current) return;
 
-            // Normalizuj pozíciu myši
             const rect = currentMount.getBoundingClientRect();
             mouseRef.current.x = ((event.clientX - rect.left) / currentMount.clientWidth) * 2 - 1;
             mouseRef.current.y = -((event.clientY - rect.top) / currentMount.clientHeight) * 2 + 1;
@@ -161,7 +155,6 @@ const ThreeScene = ({ onDataPointHover }) => {
 
             let intersectedPoint = null;
             if (intersects.length > 0) {
-                 // Nájdeme prvý objekt, ktorý je naozaj dátový bod
                  const firstDataPoint = intersects.find(intersect => intersect.object.userData.type === 'dataPoint');
                  if (firstDataPoint) {
                      intersectedPoint = firstDataPoint.object;
@@ -170,55 +163,45 @@ const ThreeScene = ({ onDataPointHover }) => {
 
             // Manažment hover stavu
             if (hoveredPointRef.current && hoveredPointRef.current !== intersectedPoint) {
-                // Opúšťame predtým hovernutý bod
                 hoveredPointRef.current.material.color.setHex(defaultPointColor);
-                onDataPointHover(null); // Informuj React
+                if(onDataPointHover) onDataPointHover(null); // Callback môže byť null/undefined
                 hoveredPointRef.current = null;
             }
 
             if (intersectedPoint && hoveredPointRef.current !== intersectedPoint) {
-                // Vstupujeme na nový bod
                 hoveredPointRef.current = intersectedPoint;
                 hoveredPointRef.current.material.color.setHex(hoverPointColor);
-                onDataPointHover(hoveredPointRef.current.userData); // Informuj React
+                 if(onDataPointHover) onDataPointHover(hoveredPointRef.current.userData); // Callback môže byť null/undefined
             }
         };
 
         window.addEventListener('resize', handleResize);
+        // Listener pre mousemove pridáme na currentMount, lebo canvas nemusí vyplniť celý div presne
         currentMount.addEventListener('mousemove', handleMouseMove);
 
         // --- Cleanup ---
         return () => {
             cancelAnimationFrame(animationFrameId);
+            animationFrameId = null; // Resetuj ID
             window.removeEventListener('resize', handleResize);
-            // Odstránime listener z mount elementu LEN AK existuje
             if(currentMount){
                 currentMount.removeEventListener('mousemove', handleMouseMove);
             }
+            // Dispose controls len ak sa komponent naozaj odpojuje
+            // Pri HMR ich chceme nechať žiť
+            // controlsRef.current?.dispose(); // Zakomentované pre lepšie HMR
 
-            // Dispose controls AK existujú
-            controlsRef.current?.dispose();
-
-            // **Poznámka k čisteniu pri HMR:**
-            // V jednoduchom prípade môžeme nechať Three.js scénu žiť medzi HMR aktualizáciami.
-            // Ak by sme chceli VŽDY všetko zničiť a postaviť nanovo, museli by sme
-            // implementovať dôkladnejšie čistenie VŠETKÝCH Three.js zdrojov
-            // (geometrie, materiály, textúry, renderer, scéna) a odstrániť
-            // `if (!rendererRef.current)` check na začiatku useEffect.
-            // Pre tento príklad to necháme zjednodušené.
+            // Tu by malo byť aj dôkladnejšie čistenie Three.js zdrojov, ak by sme to chceli 100% korektné
+            // pri odpojení komponentu (unmount), ale pre HMR je jednoduchšie to nechať tak.
         };
 
-    }, [onDataPointHover]); // Znovu spustiť useEffect len ak sa zmení callback
+    }, [onDataPointHover]); // Závislosť na callbacku
 
-    // Vráti div, do ktorého sa pripojí canvas
+    // Vráti div, do ktorého sa pripojí canvas. Odstránili sme onMouseDown/Up/Leave
     return (
         <div
             ref={mountRef}
             style={{ width: '100%', height: '100%', display: 'block', cursor: 'grab' }}
-            // Zmena kurzora pre lepšiu UX pri otáčaní
-            onMouseDown={(e) => e.currentTarget.style.cursor = 'grabbing'}
-            onMouseUp={(e) => e.currentTarget.style.cursor = 'grab'}
-            onMouseLeave={(e) => e.currentTarget.style.cursor = 'grab'} // Ak myš opustí canvas
         />
     );
 };
