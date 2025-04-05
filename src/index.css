@@ -1,3 +1,4 @@
+/* Reset a základné nastavenia */
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -5,15 +6,21 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden; /* Aby sa nezobrazovali scrollbary, ak canvas presiahne */
+  background-color: #111; /* Tmavé pozadie pre celú stránku */
+  color: white; /* Biela farba textu ako predvolená */
+  overflow: hidden; /* Zabráni scrollbarom na body */
 }
 
+/* Kontajner pre React app - vyplní celú výšku/šírku */
 #root {
     width: 100vw;
     height: 100vh;
-    display: block; 
+    display: block;
 }
 
+/* Zaistí, že canvas sa správne zobrazí */
 canvas {
-    display: block; /* Dôležité pre správne zobrazenie */
+    display: block;
+    /* Pridané pre lepšiu interakciu s OrbitControls */
+    touch-action: none;
 }
